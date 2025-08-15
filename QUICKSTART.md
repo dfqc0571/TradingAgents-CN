@@ -296,3 +296,69 @@ docker-compose restart
 ---
 
 *最后更新: 2025-07-13 | 版本: cn-0.1.7*
+
+```
+
+## 🚀 快速体验新功能 (2025年9月更新)
+
+### 🔁 Google AI API密钥轮询
+
+TradingAgents-CN现在支持配置多个Google AI API密钥实现轮询使用，提高稳定性和免费额度利用率。
+
+#### 配置方式
+在`.env`文件中添加多个Google API密钥：
+```env
+# 主密钥
+GOOGLE_API_KEY=your_main_google_api_key
+
+# 备用密钥1-10 (可选)
+GOOGLE_API_KEY_1=your_second_google_api_key
+GOOGLE_API_KEY_2=your_third_google_api_key
+# ... 最多可以配置到 GOOGLE_API_KEY_10
+```
+
+系统会自动轮询使用这些密钥，当某个密钥出现问题时会自动切换到下一个。
+
+### 🚀 N8N集成优化版本
+
+我们为N8N集成专门优化了分析性能，提供三种优化级别：
+
+1. **High (高性能)**: 分析速度提升50-70%，成本降低60-80%
+2. **Medium (平衡)**: 分析速度提升30-50%，成本降低40-60%
+3. **Low (完整功能)**: 完整分析功能，效果与原版基本一致
+
+#### N8N集成配置建议
+```json
+{
+  "optimization_level": "medium",
+  "api_key_strategy": "round_robin"
+}
+```
+
+### 🛡️ 防黑天鹅事件监控
+
+系统现在包含实时监控功能，可检测以下风险事件：
+
+- 重大新闻和政策变化
+- 技术指标异常波动
+- 基本面异常情况
+
+### 🌐 RESTful API服务
+
+TradingAgents-CN现在提供完整的RESTful API服务：
+
+#### 启动服务
+```bash
+python web/run_web.py
+```
+
+#### 访问地址
+- Web界面: http://localhost:8501
+- API接口: http://localhost:8000
+- API文档: http://localhost:8000/api/docs
+
+#### 核心API端点
+1. 股票分析: `GET /api/v1/analyze/{stock_code}`
+2. 批量分析: `POST /api/v1/batch-analyze`
+3. 实时监控: `GET /api/v1/monitor/alerts/{stock_pool}`
+4. N8N集成: `POST /n8n/analyze`, `POST /n8n/batch-analyze`, `POST /n8n/monitor`

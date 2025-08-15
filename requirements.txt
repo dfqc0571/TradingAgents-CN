@@ -1,43 +1,64 @@
-# 注意：此文件已弃用，请使用 pyproject.toml
-# 推荐安装方式：pip install -e .
-# 或使用 uv：uv pip install -e .
-
-typing-extensions
-openai>=1.0.0,<2.0.0
-langchain-openai>=0.1.0
-langchain-experimental
-pandas
-yfinance
-praw
-feedparser
-stockstats
-eodhd
-langgraph
-chromadb
-setuptools
-backtrader
-akshare
-tushare
-baostock
-finnhub-python
-parsel
-requests
-tqdm
-pytz
-redis
-chainlit
-rich
-questionary
-langchain_anthropic
-langchain-google-genai
-google-genai>=0.1.0
+# Core dependencies
+streamlit>=1.38.0
+plotly>=5.24.0
+pandas>=2.2.2
+numpy>=1.26.4
+requests>=2.32.3
+python-dotenv>=1.0.1
+pyyaml>=6.0.2
+pydantic>=2.9.1
+tushare>=1.2.72
+akshare>=1.14.85
+yfinance>=0.2.43
+finnhub-python>=2.4.21
+baostock>=0.8.8
+openai>=1.44.1
+dashscope>=1.19.1
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-google-genai>=2.1.5
+langchain-anthropic>=0.2.0
+langchain-community>=0.3.0
+langgraph>=0.2.5
+chromadb>=0.5.5
+pymongo>=4.8.0
+redis>=5.0.8
+beautifulsoup4>=4.12.3
+lxml>=5.3.0
+fake-useragent>=1.5.1
+pytesseract>=0.3.13
+pillow>=10.4.0
+psutil>=6.0.0
+stockstats>=0.6.2
+python-dateutil>=2.9.0
+pytz>=2024.1
+tzdata>=2024.1
+urllib3>=2.2.2
+certifi>=2024.8.30
+charset-normalizer>=3.3.2
+idna>=3.10
+six>=1.16.0
+click>=8.1.7
+altair>=5.4.1
+blinker>=1.8.2
+cachetools>=5.5.0
+gitdb>=4.0.11
+gitpython>=3.1.43
+jsonschema>=4.23.0
+markdown-it-py>=3.0.0
+mdurl>=0.1.2
+packaging>=24.1
+protobuf>=5.28.1
+pyarrow>=17.0.0
+pydeck>=0.9.1
+rich>=13.8.1
+smmap>=5.0.1
+tenacity>=8.5.0
+toml>=0.10.2
+tornado>=6.4.1
+typing-extensions>=4.12.2
+watchdog>=4.0.2
+fastapi>=0.115.0
+uvicorn>=0.30.6
 google-generativeai>=0.8.0
-dashscope
-streamlit
-plotly
-psutil
-pytdx  # 通达信数据接口（已弃用，保留兼容性）
-pymongo  # MongoDB数据库支持，用于Token使用记录存储
-markdown>=3.4.0  # Markdown处理，用于报告生成
-pypandoc>=1.11  # 文档格式转换，用于导出报告功能
-python-dotenv>=1.0.0  # 环境变量管理，用于.env文件解析
+google-genai>=0.1.0

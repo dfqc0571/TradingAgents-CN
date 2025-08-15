@@ -12,6 +12,7 @@ from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, System
 from langchain_core.outputs import LLMResult
 from pydantic import Field, SecretStr
 from ..config.config_manager import token_tracker
+from ..config.api_key_manager import get_api_key_manager
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -34,6 +35,11 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         
         # 检查 API 密钥
         google_api_key = kwargs.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
+        # 如果没有提供特定密钥，使用轮询机制获取
+        if not google_api_key:
+            api_key_manager = get_api_key_manager()
+            google_api_key = api_key_manager.get_next_google_key()
+            
         if not google_api_key:
             raise ValueError(
                 "Google API key not found. Please set GOOGLE_API_KEY environment variable "
@@ -44,6 +50,9 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         
         # 调用父类初始化
         super().__init__(**kwargs)
+        
+        # 保存API密钥管理器引用用于错误处理
+        self._api_key_manager = get_api_key_manager()
 
         logger.info(f"✅ Google AI OpenAI 兼容适配器初始化成功")
         logger.info(f"   模型: {kwargs.get('model', 'gemini-pro')}")
@@ -70,6 +79,10 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
             return result
             
         except Exception as e:
+            # 标记当前API密钥出现错误
+            if hasattr(self, 'google_api_key'):
+                self._api_key_manager.mark_key_error(self.google_api_key)
+            
             logger.error(f"❌ Google AI 生成失败: {e}")
             # 返回一个包含错误信息的结果，而不是抛出异常
             from langchain_core.outputs import ChatGeneration

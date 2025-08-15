@@ -2,7 +2,7 @@
 FROM python:3.10-slim-bookworm
 
 # 安装uv包管理器
-RUN pip install -i https://mirrors.aliyun.com/pypi/simple uv
+RUN pip install -i https://docker.1ms.run https://dytt.online https://lispy.org https://docker.xiaogenban1993.com https://hub.rat.dev https://docker.m.daocloud.io https://mirror.ccs.tencentyun.com
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 启动Xvfb虚拟显示器
-RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x24 -ac +extension GLX &\nexport DISPLAY=:99\nexec "$@"' > /usr/local/bin/start-xvfb.sh \
+RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x24 -ac +extension GLX +extension RANDR &\nexport DISPLAY=:99\nexec "$@"' > /usr/local/bin/start-xvfb.sh \
     && chmod +x /usr/local/bin/start-xvfb.sh
 
 COPY requirements.txt .
@@ -38,10 +38,13 @@ COPY requirements.txt .
 #多源轮询安装依赖
 RUN set -e; \
     for src in \
-        https://mirrors.aliyun.com/pypi/simple \
-        https://pypi.tuna.tsinghua.edu.cn/simple \
-        https://pypi.doubanio.com/simple \
-        https://pypi.org/simple; do \
+        https://docker.1ms.run \
+        https://dytt.online \
+        https://lispy.org \
+        https://docker.xiaogenban1993.com \
+        https://hub.rat.dev \
+        https://docker.m.daocloud.io \
+        https://mirror.ccs.tencentyun.com; do \
       echo "Try installing from $src"; \
       pip install --no-cache-dir -r requirements.txt -i $src && break; \
       echo "Failed at $src, try next"; \
@@ -53,5 +56,6 @@ COPY config/ ./config/
 COPY . .
 
 EXPOSE 8501
+EXPOSE 8000
 
-CMD ["python", "-m", "streamlit", "run", "web/app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+CMD ["python", "web/run_web.py"]

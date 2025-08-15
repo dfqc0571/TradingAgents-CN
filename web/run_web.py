@@ -7,6 +7,8 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+import signal
+import asyncio
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -19,7 +21,7 @@ logger = get_logger('web')
 def check_dependencies():
     """检查必要的依赖是否已安装"""
 
-    required_packages = ['streamlit', 'plotly']
+    required_packages = ['streamlit', 'plotly', 'fastapi', 'uvicorn']
     missing_packages = []
 
     for package in required_packages:
@@ -28,6 +30,10 @@ def check_dependencies():
                 import streamlit
             elif package == 'plotly':
                 import plotly
+            elif package == 'fastapi':
+                import fastapi
+            elif package == 'uvicorn':
+                import uvicorn
         except ImportError:
             missing_packages.append(package)
 
@@ -49,218 +55,128 @@ def clean_cache_files(force_clean=False):
     """
 
     project_root = Path(__file__).parent.parent
+    cache_patterns = ["**/__pycache__", "**/*.pyc", "**/*.pyo", "**/*~"]
 
-    # 安全的缓存目录搜索，避免递归错误
-    cache_dirs = []
-    try:
-        # 限制搜索深度，避免循环符号链接问题
-        for root, dirs, files in os.walk(project_root):
-            # 限制搜索深度为5层，避免过深递归
-            depth = root.replace(str(project_root), '').count(os.sep)
-            if depth >= 5:
-                dirs[:] = []  # 不再深入搜索
-                continue
-
-            # 跳过已知的问题目录
-            dirs[:] = [d for d in dirs if d not in {'.git', 'node_modules', '.venv', 'env', '.tox'}]
-
-            if '__pycache__' in dirs:
-                cache_dirs.append(Path(root) / '__pycache__')
-
-    except (OSError, RecursionError) as e:
-        logger.warning(f"⚠️ 缓存搜索遇到问题: {e}")
-        logger.info(f"💡 跳过缓存清理，继续启动应用")
-
-    if not cache_dirs:
-        logger.info(f"✅ 无需清理缓存文件")
-        return
-
-    # 检查环境变量是否禁用清理（使用强健的布尔值解析）
-    try:
-        from tradingagents.config.env_utils import parse_bool_env
-        skip_clean = parse_bool_env('SKIP_CACHE_CLEAN', False)
-    except ImportError:
-        # 回退到原始方法
-        skip_clean = os.getenv('SKIP_CACHE_CLEAN', 'false').lower() == 'true'
-
-    if skip_clean and not force_clean:
-        logger.info(f"⏭️ 跳过缓存清理（SKIP_CACHE_CLEAN=true）")
-        return
-
-    if not force_clean:
-        # 可选清理：只清理项目代码的缓存，不清理虚拟环境
-        project_cache_dirs = [d for d in cache_dirs if 'env' not in str(d)]
-        if project_cache_dirs:
-            logger.info(f"🧹 清理项目缓存文件...")
-            for cache_dir in project_cache_dirs:
+    cleaned_count = 0
+    for pattern in cache_patterns:
+        for file_path in project_root.glob(pattern):
+            if file_path.is_file():
                 try:
-                    import shutil
-                    shutil.rmtree(cache_dir)
-                    logger.info(f"  ✅ 已清理: {cache_dir.relative_to(project_root)}")
+                    file_path.unlink()
+                    cleaned_count += 1
+                    if force_clean:
+                        logger.debug(f"🧹 清理缓存文件: {file_path}")
                 except Exception as e:
-                    logger.error(f"  ⚠️ 清理失败: {cache_dir.relative_to(project_root)} - {e}")
-            logger.info(f"✅ 项目缓存清理完成")
-        else:
-            logger.info(f"✅ 无需清理项目缓存")
+                    if force_clean:
+                        logger.warning(f"⚠️ 无法清理文件 {file_path}: {e}")
+            elif file_path.is_dir():
+                try:
+                    file_path.rmdir()
+                    cleaned_count += 1
+                    if force_clean:
+                        logger.debug(f"🧹 清理缓存目录: {file_path}")
+                except Exception as e:
+                    if force_clean:
+                        logger.warning(f"⚠️ 无法清理目录 {file_path}: {e}")
+
+    if cleaned_count > 0:
+        logger.info(f"🧹 总共清理了 {cleaned_count} 个缓存文件/目录")
     else:
-        # 强制清理：清理所有缓存
-        logger.info(f"🧹 强制清理所有缓存文件...")
-        for cache_dir in cache_dirs:
-            try:
-                import shutil
-                shutil.rmtree(cache_dir)
-                logger.info(f"  ✅ 已清理: {cache_dir.relative_to(project_root)}")
-            except Exception as e:
-                logger.error(f"  ⚠️ 清理失败: {cache_dir.relative_to(project_root)} - {e}")
-        logger.info(f"✅ 所有缓存清理完成")
+        logger.info("✅ 无缓存文件需要清理")
 
-def check_api_keys():
-    """检查API密钥配置"""
+def start_streamlit():
+    """启动Streamlit应用"""
+    logger.info("🚀 启动Streamlit应用...")
     
-    from dotenv import load_dotenv
-    
-    # 加载环境变量
-    project_root = Path(__file__).parent.parent
-    load_dotenv(project_root / ".env")
-    
-    dashscope_key = os.getenv("DASHSCOPE_API_KEY")
-    finnhub_key = os.getenv("FINNHUB_API_KEY")
-    
-    if not dashscope_key or not finnhub_key:
-        logger.warning(f"⚠️ API密钥配置不完整")
-        logger.info(f"请确保在.env文件中配置以下密钥:")
-        if not dashscope_key:
-            logger.info(f"  - DASHSCOPE_API_KEY (阿里百炼)")
-        if not finnhub_key:
-            logger.info(f"  - FINNHUB_API_KEY (金融数据)")
-        logger.info(f"\n配置方法:")
-        logger.info(f"1. 复制 .env.example 为 .env")
-        logger.info(f"2. 编辑 .env 文件，填入真实API密钥")
-        return False
-    
-    logger.info(f"✅ API密钥配置完成")
-    return True
-
-# 在文件顶部添加导入
-import signal
-import psutil
-
-# 修改 main() 函数中的启动部分
-def main():
-    """主函数"""
-    
-    logger.info(f"🚀 TradingAgents-CN Web应用启动器")
-    logger.info(f"=")
-    
-    # 清理缓存文件（可选，避免Streamlit文件监控错误）
-    clean_cache_files(force_clean=False)
-    
-    # 检查依赖
-    logger.debug(f"🔍 检查依赖包...")
-    if not check_dependencies():
-        return
-    
-    # 检查API密钥
-    logger.info(f"🔑 检查API密钥...")
-    if not check_api_keys():
-        logger.info(f"\n💡 提示: 您仍可以启动Web应用查看界面，但无法进行实际分析")
-        response = input("是否继续启动? (y/n): ").lower().strip()
-        if response != 'y':
-            return
-    
-    # 启动Streamlit应用
-    logger.info(f"\n🌐 启动Web应用...")
-    
-    web_dir = Path(__file__).parent
-    app_file = web_dir / "app.py"
-    
-    if not app_file.exists():
-        logger.error(f"❌ 找不到应用文件: {app_file}")
-        return
-    
-    # 构建Streamlit命令
-    config_dir = web_dir.parent / ".streamlit"
+    # 构建命令
     cmd = [
-        sys.executable, "-m", "streamlit", "run", 
-        str(app_file),
+        sys.executable, "-m", "streamlit", "run",
+        str(project_root / "web" / "app.py"),
         "--server.port", "8501",
-        "--server.address", "localhost",
-        "--browser.gatherUsageStats", "false",
-        "--server.fileWatcherType", "auto",
-        "--server.runOnSave", "true"
+        "--server.address", "0.0.0.0",
+        "--logger.level", "info"
     ]
     
-    # 如果配置目录存在，添加配置路径
-    if config_dir.exists():
-        logger.info(f"📁 使用配置目录: {config_dir}")
-        # Streamlit会自动查找.streamlit/config.toml文件
+    # 启动Streamlit
+    process = subprocess.Popen(cmd)
+    logger.info(f"📊 Streamlit应用已启动 (PID: {process.pid})")
+    return process
+
+def start_fastapi():
+    """启动FastAPI服务"""
+    logger.info("🚀 启动FastAPI服务...")
     
-    logger.info(f"执行命令: {' '.join(cmd)}")
-    logger.info(f"\n🎉 Web应用启动中...")
-    logger.info(f"📱 浏览器将自动打开 http://localhost:8501")
-    logger.info(f"⏹️  按 Ctrl+C 停止应用")
-    logger.info(f"=")
+    # 构建命令
+    cmd = [
+        sys.executable, "-m", "uvicorn",
+        "web.api.main:app",
+        "--host", "0.0.0.0",
+        "--port", "8000",
+        "--reload"
+    ]
     
-    # 创建进程对象而不是直接运行
-    process = None
-    
-    def signal_handler(signum, frame):
-        """信号处理函数"""
-        logger.info(f"\n\n⏹️ 接收到停止信号，正在关闭Web应用...")
-        if process:
-            try:
-                # 终止进程及其子进程
-                parent = psutil.Process(process.pid)
-                for child in parent.children(recursive=True):
-                    child.terminate()
-                parent.terminate()
-                
-                # 等待进程结束
-                parent.wait(timeout=5)
-                logger.info(f"✅ Web应用已成功停止")
-            except (psutil.NoSuchProcess, psutil.TimeoutExpired):
-                logger.warning(f"⚠️ 强制终止进程")
-                if process:
-                    process.kill()
-        sys.exit(0)
-    
-    # 注册信号处理器
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # 更改工作目录到项目根目录
+    original_cwd = os.getcwd()
+    os.chdir(project_root)
     
     try:
-        # 启动Streamlit进程
-        process = subprocess.Popen(cmd, cwd=web_dir)
-        process.wait()  # 等待进程结束
+        # 启动FastAPI
+        process = subprocess.Popen(cmd)
+        logger.info(f"🔌 FastAPI服务已启动 (PID: {process.pid})")
+        return process
+    finally:
+        # 恢复工作目录
+        os.chdir(original_cwd)
+
+def main():
+    """主函数"""
+    logger.info("🚀 启动TradingAgents-CN Web应用")
+    
+    # 检查依赖
+    if not check_dependencies():
+        sys.exit(1)
+    
+    # 清理缓存文件
+    clean_cache_files()
+    
+    # 启动服务
+    try:
+        # 启动Streamlit和FastAPI
+        streamlit_process = start_streamlit()
+        fastapi_process = start_fastapi()
+        
+        logger.info("✅ 所有服务已启动:")
+        logger.info("   📊 Web界面: http://localhost:8501")
+        logger.info("   🔌 API接口: http://localhost:8000")
+        logger.info("   📖 API文档: http://localhost:8000/api/docs")
+        
+        # 等待进程结束
+        def signal_handler(sig, frame):
+            logger.info("🛑 正在关闭服务...")
+            streamlit_process.terminate()
+            fastapi_process.terminate()
+            streamlit_process.wait()
+            fastapi_process.wait()
+            logger.info("✅ 所有服务已关闭")
+            sys.exit(0)
+        
+        # 注册信号处理器
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # 等待进程
+        while True:
+            try:
+                streamlit_process.wait(timeout=1)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+                
     except KeyboardInterrupt:
-        signal_handler(signal.SIGINT, None)
+        logger.info("🛑 用户中断，正在关闭服务...")
     except Exception as e:
-        logger.error(f"\n❌ 启动失败: {e}")
+        logger.error(f"❌ 启动服务时出错: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    import sys
-
-    # 检查命令行参数
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--no-clean":
-            # 设置环境变量跳过清理
-            import os
-            os.environ['SKIP_CACHE_CLEAN'] = 'true'
-            logger.info(f"🚀 启动模式: 跳过缓存清理")
-        elif sys.argv[1] == "--force-clean":
-            # 强制清理所有缓存
-            logger.info(f"🚀 启动模式: 强制清理所有缓存")
-            clean_cache_files(force_clean=True)
-        elif sys.argv[1] == "--help":
-            logger.info(f"🚀 TradingAgents-CN Web应用启动器")
-            logger.info(f"=")
-            logger.info(f"用法:")
-            logger.info(f"  python run_web.py           # 默认启动（清理项目缓存）")
-            logger.info(f"  python run_web.py --no-clean      # 跳过缓存清理")
-            logger.info(f"  python run_web.py --force-clean   # 强制清理所有缓存")
-            logger.info(f"  python run_web.py --help          # 显示帮助")
-            logger.info(f"\n环境变量:")
-            logger.info(f"  SKIP_CACHE_CLEAN=true       # 跳过缓存清理")
-            exit(0)
-
     main()

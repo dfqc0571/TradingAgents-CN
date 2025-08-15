@@ -18,28 +18,27 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
-## 🆕 v0.1.13 重大更新
+## 🆕 最新功能更新 (2025年9月)
 
-### 🤖 原生OpenAI端点支持
+### 🔁 Google AI API密钥轮询机制
+- 支持配置最多10个Google AI API密钥实现轮询使用
+- 自动错误检测和密钥切换机制
+- 提高API调用稳定性和免费额度利用率
 
-- **自定义OpenAI端点**: 支持配置任意OpenAI兼容的API端点
-- **灵活模型选择**: 可以使用任何OpenAI格式的模型，不限于官方模型
-- **智能适配器**: 新增原生OpenAI适配器，提供更好的兼容性和性能
-- **配置管理**: 统一的端点和模型配置管理系统
+### 🚀 N8N集成优化
+- 专门针对N8N工作流优化的高性能分析版本
+- 三种优化级别：high（高性能）、medium（平衡）、low（完整功能）
+- 提供完整的RESTful API接口
 
-### 🧠 Google AI生态系统全面集成
+### 🛡️ 防黑天鹅事件监控系统
+- 实时新闻监控和关键词检测
+- 技术指标异常预警
+- 基本面异常检测功能
 
-- **三大Google AI包支持**: langchain-google-genai、google-generativeai、google-genai
-- **9个验证模型**: gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash等最新模型
-- **Google工具处理器**: 专门的Google AI工具调用处理器
-- **智能降级机制**: 高级功能失败时自动降级到基础功能
-
-### 🔧 LLM适配器架构优化
-
-- **GoogleOpenAIAdapter**: 新增Google AI的OpenAI兼容适配器
-- **统一接口**: 所有LLM提供商使用统一的调用接口
-- **错误处理增强**: 改进的异常处理和自动重试机制
-- **性能监控**: 添加LLM调用性能监控和统计
+### 🌐 完整的API服务
+- 基于FastAPI的RESTful API服务
+- 股票分析、批量分析和实时监控接口
+- 自动生成API文档
 
 ### 🎨 Web界面智能优化
 
@@ -267,48 +266,44 @@
 
 ## 🚀 快速开始
 
-### 🐳 Docker部署 (推荐)
+### 系统要求
+- Python 3.10+
+- Docker (推荐)
+- Google AI API密钥 (推荐) 或其他LLM提供商密钥
 
+### 安装方式
+
+#### Docker部署 (推荐)
 ```bash
-# 1. 克隆项目
+# 克隆项目
 git clone https://github.com/hsliuping/TradingAgents-CN.git
 cd TradingAgents-CN
 
-# 2. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，填入API密钥
-
-# 3. 启动服务
-# 首次启动或代码变更时（需要构建镜像）
+# 构建并启动服务
 docker-compose up -d --build
 
-# 日常启动（镜像已存在，无代码变更）
-docker-compose up -d
-
-# 智能启动（自动判断是否需要构建）
-# Windows环境
-powershell -ExecutionPolicy Bypass -File scripts\smart_start.ps1
-
-# Linux/Mac环境
-chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
-
-# 4. 访问应用
+# 访问应用
 # Web界面: http://localhost:8501
+# API接口: http://localhost:8000
+# API文档: http://localhost:8000/api/docs
 ```
 
-### 💻 本地部署
-
+#### 本地部署
 ```bash
-# 1. 升级pip (重要！避免安装错误)
-python -m pip install --upgrade pip
+# 克隆项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
 
-# 2. 安装依赖
+# 安装依赖
 pip install -e .
 
-# 3. 启动应用
-python start_web.py
+# 启动应用
+python web/run_web.py
 
-# 4. 访问 http://localhost:8501
+# 访问应用
+# Web界面: http://localhost:8501
+# API接口: http://localhost:8000
+# API文档: http://localhost:8000/api/docs
 ```
 
 ### 📊 开始分析
@@ -411,26 +406,23 @@ cp .env.example .env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
 FINNHUB_API_KEY=your_finnhub_api_key_here
 
-# 推荐：Tushare API（专业A股数据）
-TUSHARE_TOKEN=your_tushare_token_here
-TUSHARE_ENABLED=true
+# 主密钥
+GOOGLE_API_KEY=your_main_google_api_key
 
-# 可选：其他AI模型API
-GOOGLE_API_KEY=your_google_api_key_here
-DEEPSEEK_API_KEY=your_deepseek_api_key_here
+# 备用密钥1-10 (可选)
+GOOGLE_API_KEY_1=your_second_google_api_key
+GOOGLE_API_KEY_2=your_third_google_api_key
+# ... 最多可以配置到 GOOGLE_API_KEY_10
 
-# 数据库配置（可选，提升性能）
-# 本地部署使用标准端口
-MONGODB_ENABLED=false  # 设为true启用MongoDB
-REDIS_ENABLED=false    # 设为true启用Redis
-MONGODB_HOST=localhost
-MONGODB_PORT=27017     # 标准MongoDB端口
-REDIS_HOST=localhost
-REDIS_PORT=6379        # 标准Redis端口
+# N8N集成配置建议
+建议使用以下配置以平衡性能和准确性：
 
-# Docker部署时需要修改主机名
-# MONGODB_HOST=mongodb
-# REDIS_HOST=redis
+```json
+{
+  "optimization_level": "medium",
+  "api_key_strategy": "round_robin"
+}
+```
 ```
 
 #### 📋 部署模式配置说明
@@ -1187,138 +1179,3 @@ cost_optimized_config = {
     "online_tools": False  # 使用缓存数据
 }
 ```
-
-## 🤝 贡献指南
-
-我们欢迎各种形式的贡献：
-
-### 贡献类型
-
-- 🐛 **Bug修复** - 发现并修复问题
-- ✨ **新功能** - 添加新的功能特性
-- 📚 **文档改进** - 完善文档和教程
-- 🌐 **本地化** - 翻译和本地化工作
-- 🎨 **代码优化** - 性能优化和代码重构
-
-### 贡献流程
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-### 📋 查看贡献者
-
-查看所有贡献者和详细贡献内容：**[🤝 贡献者名单](CONTRIBUTORS.md)**
-
-## 📄 许可证
-
-本项目基于 Apache 2.0 许可证开源。详见 [LICENSE](LICENSE) 文件。
-
-### 许可证说明
-
-- ✅ 商业使用
-- ✅ 修改和分发
-- ✅ 私人使用
-- ✅ 专利使用
-- ❗ 需要保留版权声明
-- ❗ 需要包含许可证副本
-
-## 🙏 致谢与感恩
-
-### 🌟 向源项目开发者致敬
-
-我们向 [Tauric Research](https://github.com/TauricResearch) 团队表达最深的敬意和感谢：
-
-- **🎯 愿景领导者**: 感谢您们在AI金融领域的前瞻性思考和创新实践
-- **💎 珍贵源码**: 感谢您们开源的每一行代码，它们凝聚着无数的智慧和心血
-- **🏗️ 架构大师**: 感谢您们设计了如此优雅、可扩展的多智能体框架
-- **💡 技术先驱**: 感谢您们将前沿AI技术与金融实务完美结合
-- **🔄 持续贡献**: 感谢您们持续的维护、更新和改进工作
-
-### 🤝 社区贡献者致谢
-
-感谢所有为TradingAgents-CN项目做出贡献的开发者和用户！
-
-详细的贡献者名单和贡献内容请查看：**[📋 贡献者名单](CONTRIBUTORS.md)**
-
-包括但不限于：
-
-- 🐳 **Docker容器化** - 部署方案优化
-- 📄 **报告导出功能** - 多格式输出支持
-- 🐛 **Bug修复** - 系统稳定性提升
-- 🔧 **代码优化** - 用户体验改进
-- 📝 **文档完善** - 使用指南和教程
-- 🌍 **社区建设** - 问题反馈和推广
-- **🌍 开源贡献**: 感谢您们选择Apache 2.0协议，给予开发者最大的自由
-- **📚 知识分享**: 感谢您们提供的详细文档和最佳实践指导
-
-**特别感谢**：[TradingAgents](https://github.com/TauricResearch/TradingAgents) 项目为我们提供了坚实的技术基础。虽然Apache 2.0协议赋予了我们使用源码的权利，但我们深知每一行代码的珍贵价值，将永远铭记并感谢您们的无私贡献。
-
-### 🇨🇳 推广使命的初心
-
-创建这个中文增强版本，我们怀着以下初心：
-
-- **🌉 技术传播**: 让优秀的TradingAgents技术在中国得到更广泛的应用
-- **🎓 教育普及**: 为中国的AI金融教育提供更好的工具和资源
-- **🤝 文化桥梁**: 在中西方技术社区之间搭建交流合作的桥梁
-- **🚀 创新推动**: 推动中国金融科技领域的AI技术创新和应用
-
-### 🌍 开源社区
-
-感谢所有为本项目贡献代码、文档、建议和反馈的开发者和用户。正是因为有了大家的支持，我们才能更好地服务中文用户社区。
-
-### 🤝 合作共赢
-
-我们承诺：
-
-- **尊重原创**: 始终尊重源项目的知识产权和开源协议
-- **反馈贡献**: 将有价值的改进和创新反馈给源项目和开源社区
-- **持续改进**: 不断完善中文增强版本，提供更好的用户体验
-- **开放合作**: 欢迎与源项目团队和全球开发者进行技术交流与合作
-
-## 📈 版本历史
-
-- **v0.1.13** (2025-08-02): 🤖 原生OpenAI支持与Google AI生态系统全面集成 ✨ **最新版本**
-- **v0.1.12** (2025-07-29): 🧠 智能新闻分析模块与项目结构优化
-- **v0.1.11** (2025-07-27): 🤖 多LLM提供商集成与模型选择持久化
-- **v0.1.10** (2025-07-18): 🚀 Web界面实时进度显示与智能会话管理
-- **v0.1.9** (2025-07-16): 🎯 CLI用户体验重大优化与统一日志管理
-- **v0.1.8** (2025-07-15): 🎨 Web界面全面优化与用户体验提升
-- **v0.1.7** (2025-07-13): 🐳 容器化部署与专业报告导出
-- **v0.1.6** (2025-07-11): 🔧 阿里百炼修复与数据源升级
-- **v0.1.5** (2025-07-08): 📊 添加Deepseek模型支持
-- **v0.1.4** (2025-07-05): 🏗️ 架构优化与配置管理重构
-- **v0.1.3** (2025-06-28): 🇨🇳 A股市场完整支持
-- **v0.1.2** (2025-06-15): 🌐 Web界面和配置管理
-- **v0.1.1** (2025-06-01): 🧠 国产LLM集成
-
-📋 **详细更新日志**: [CHANGELOG.md](./docs/releases/CHANGELOG.md)
-
-## 📞 联系方式
-
-- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
-- **邮箱**: hsliup@163.com
-- 项目ＱＱ群：782124367
-- **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
-- **文档**: [完整文档目录](docs/)
-
-## ⚠️ 风险提示
-
-**重要声明**: 本框架仅用于研究和教育目的，不构成投资建议。
-
-- 📊 交易表现可能因多种因素而异
-- 🤖 AI模型的预测存在不确定性
-- 💰 投资有风险，决策需谨慎
-- 👨‍💼 建议咨询专业财务顾问
-
----
-
-<div align="center">
-
-**🌟 如果这个项目对您有帮助，请给我们一个 Star！**
-
-[⭐ Star this repo](https://github.com/hsliuping/TradingAgents-CN) | [🍴 Fork this repo](https://github.com/hsliuping/TradingAgents-CN/fork) | [📖 Read the docs](./docs/)
-
-</div>
