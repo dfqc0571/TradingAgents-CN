@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union, Sequence
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import BaseTool
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
-from langchain_core.outputs import LLMResult
+from langchain_core.outputs import LLMResult, ChatGeneration
 from pydantic import Field, SecretStr
 from ..config.config_manager import token_tracker
 from ..config.api_key_manager import get_api_key_manager
@@ -66,26 +66,36 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
             # 调用父类的生成方法
             result = super()._generate(messages, stop, **kwargs)
             
-            # 优化返回内容格式
-            if result and result.generations:
-                # 处理可能的嵌套列表结构
+            # 修复可能的列表格式问题
+            if result and hasattr(result, 'generations') and result.generations:
+                # 确保 generations 是正确的格式
                 if isinstance(result.generations, list):
-                    for generation_item in result.generations:
-                        # 如果是列表中的列表
-                        if isinstance(generation_item, list):
-                            for generation in generation_item:
-                                if hasattr(generation, 'message') and generation.message:
-                                    self._optimize_message_content(generation.message)
-                        # 如果是单个generation对象
-                        elif hasattr(generation_item, 'message') and generation_item.message:
-                            self._optimize_message_content(generation_item.message)
-                        # 如果generation_item本身就是一个message对象
-                        elif hasattr(generation_item, 'content'):
-                            self._optimize_message_content(generation_item)
-                else:
-                    # 处理非列表情况
-                    if hasattr(result.generations, 'message') and result.generations.message:
-                        self._optimize_message_content(result.generations.message)
+                    # 处理嵌套列表的情况
+                    fixed_generations = []
+                    for gen_item in result.generations:
+                        if isinstance(gen_item, list):
+                            # 如果是嵌套列表，只取第一个元素
+                            if gen_item:
+                                fixed_generations.append(gen_item[0])
+                            else:
+                                fixed_generations.append([])
+                        else:
+                            fixed_generations.append(gen_item)
+                    result.generations = fixed_generations
+                
+                # 优化返回内容格式
+                for generation_item in result.generations:
+                    # 如果是列表中的列表
+                    if isinstance(generation_item, list) and generation_item:
+                        generation = generation_item[0]
+                        if hasattr(generation, 'message') and generation.message:
+                            self._optimize_message_content(generation.message)
+                    # 如果是单个generation对象
+                    elif hasattr(generation_item, 'message') and generation_item.message:
+                        self._optimize_message_content(generation_item.message)
+                    # 如果generation_item本身就是一个message对象
+                    elif hasattr(generation_item, 'content'):
+                        self._optimize_message_content(generation_item)
             
             # 追踪 token 使用量
             self._track_token_usage(result, kwargs)
@@ -99,7 +109,6 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
             
             logger.error(f"❌ Google AI 生成失败: {e}")
             # 返回一个包含错误信息的结果，而不是抛出异常
-            from langchain_core.outputs import ChatGeneration
             error_message = AIMessage(content=f"Google AI 调用失败: {str(e)}")
             error_generation = ChatGeneration(message=error_message)
             return LLMResult(generations=[[error_generation]])
@@ -109,19 +118,34 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         
         if not isinstance(message, AIMessage) or not message.content:
             return
-        
-        content = message.content
-        
-        # 检查是否是工具调用返回的新闻内容
-        if self._is_news_content(content):
-            # 优化新闻内容格式，添加必要的关键词
-            optimized_content = self._enhance_news_content(content)
-            message.content = optimized_content
+
+        # 确保tool_calls属性存在且格式正确
+        if not hasattr(message, 'tool_calls'):
+            message.tool_calls = []
+        elif message.tool_calls is None:
+            message.tool_calls = []
+        elif not isinstance(message.tool_calls, list):
+            # 如果tool_calls不是列表，将其转换为列表
+            message.tool_calls = [message.tool_calls] if message.tool_calls else []
             
-            logger.debug(f"🔧 [Google适配器] 优化新闻内容格式")
-            logger.debug(f"   原始长度: {len(content)} 字符")
-            logger.debug(f"   优化后长度: {len(optimized_content)} 字符")
-    
+        # 检查tool_calls中的每个元素是否是字典格式，如果不是则转换
+        for i, tool_call in enumerate(message.tool_calls):
+            if not isinstance(tool_call, dict):
+                # 尝试从对象中提取必要的属性
+                if hasattr(tool_call, 'name') and hasattr(tool_call, 'args'):
+                    message.tool_calls[i] = {
+                        'name': tool_call.name,
+                        'args': tool_call.args,
+                        'id': getattr(tool_call, 'id', f'tool_call_{i}')
+                    }
+                else:
+                    # 如果无法提取必要属性，移除该工具调用
+                    logger.warning(f"⚠️ 无法识别的工具调用格式: {type(tool_call)}")
+                    message.tool_calls[i] = {}
+
+        # 清理空的工具调用
+        message.tool_calls = [tc for tc in message.tool_calls if tc]
+
     def _is_news_content(self, content: str) -> bool:
         """判断内容是否为新闻内容"""
         

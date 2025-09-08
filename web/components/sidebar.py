@@ -343,9 +343,14 @@ def render_sidebar():
                 "gemini-1.5-flash"
             ]
 
-            # 获取当前选择的索引
-            current_index = 0
-            if st.session_state.llm_model in google_options:
+            # 获取当前选择的索引，优先选择gemini-2.5-flash
+            current_index = 6  # 默认选择gemini-2.5-flash-lite-preview-06-17
+            default_google_model = os.getenv("DEFAULT_GOOGLE_MODEL", "gemini-2.5-flash")
+            
+            # 检查环境变量中设置的默认模型
+            if default_google_model in google_options:
+                current_index = google_options.index(default_google_model)
+            elif st.session_state.llm_model in google_options:
                 current_index = google_options.index(st.session_state.llm_model)
 
             llm_model = st.selectbox(
