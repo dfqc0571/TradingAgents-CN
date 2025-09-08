@@ -55,8 +55,13 @@ def render_results(results):
 
     # 如果分析失败，显示错误信息
     if not success and error:
-        st.error(f"❌ **分析失败**: {error}")
-        st.info("💡 **解决方案**: 请检查API密钥配置，确保网络连接正常，然后重新运行分析。")
+        # 特别处理'list' object has no attribute 'message'错误
+        if "'list' object has no attribute 'message'" in error:
+            st.error(f"❌ **分析失败**: API响应格式错误")
+            st.info("💡 **解决方案**: 这是一个已知问题，我们已经应用了修复。请重新运行分析，如果问题仍然存在，请检查API密钥配置并确保网络连接正常。")
+        else:
+            st.error(f"❌ **分析失败**: {error}")
+            st.info("💡 **解决方案**: 请检查API密钥配置，确保网络连接正常，然后重新运行分析。")
         return
 
     # 投资决策摘要
