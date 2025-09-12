@@ -1,6 +1,7 @@
 """
-OpenAI兼容适配器基类
-为所有支持OpenAI接口的LLM提供商提供统一的基础实现
+OpenAI兼容适配器基类和工厂函数
+为 TradingAgents 提供统一的 OpenAI 兼容接口
+支持多种提供商: DeepSeek, DashScope, Custom OpenAI 等
 """
 
 import os
@@ -60,9 +61,6 @@ class OpenAICompatibleBase(ChatOpenAI):
             **kwargs: 其他参数
         """
         
-        self.provider_name = provider_name
-        self.model_name = model
-        
         # 获取API密钥
         if api_key is None:
             api_key = os.getenv(api_key_env_var)
@@ -96,6 +94,10 @@ class OpenAICompatibleBase(ChatOpenAI):
         
         # 初始化父类
         super().__init__(**openai_kwargs)
+        
+        # 设置实例属性（避免与Pydantic字段冲突）
+        object.__setattr__(self, 'provider_name', provider_name)
+        object.__setattr__(self, 'model_name', model)
 
         logger.info(f"✅ {provider_name} OpenAI兼容适配器初始化成功")
         logger.info(f"   模型: {model}")
@@ -215,6 +217,29 @@ class ChatDashScopeOpenAIUnified(OpenAICompatibleBase):
         )
 
 
+class ChatModelScopeOpenAI(OpenAICompatibleBase):
+    """魔搭社区 OpenAI兼容适配器"""
+    
+    def __init__(
+        self,
+        model: str = "Qwen/Qwen3-235B-A22B-Thinking-2507",
+        api_key: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        super().__init__(
+            provider_name="modelscope",
+            model=model,
+            api_key_env_var="MODELSCOPE_API_KEY",
+            base_url="https://api-inference.modelscope.cn/v1",
+            api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        )
+
+
 class ChatCustomOpenAI(OpenAICompatibleBase):
     """自定义OpenAI端点适配器"""
     
@@ -264,6 +289,14 @@ OPENAI_COMPATIBLE_PROVIDERS = {
             "qwen-plus-latest": {"context_length": 32768, "supports_function_calling": True},
             "qwen-max": {"context_length": 32768, "supports_function_calling": True},
             "qwen-max-latest": {"context_length": 32768, "supports_function_calling": True}
+        }
+    },
+    "modelscope": {
+        "adapter_class": ChatModelScopeOpenAI,
+        "base_url": "https://api-inference.modelscope.cn/v1",
+        "api_key_env": "MODELSCOPE_API_KEY",
+        "models": {
+            "Qwen/Qwen3-235B-A22B-Thinking-2507": {"context_length": 32768, "supports_function_calling": True}
         }
     },
     "custom_openai": {

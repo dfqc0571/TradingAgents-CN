@@ -275,6 +275,54 @@ class FinancialSituationMemory:
                 self.client = "DISABLED"
                 logger.warning(f"⚠️ OpenRouter未找到DASHSCOPE_API_KEY，记忆功能已禁用")
                 logger.info(f"💡 系统将继续运行，但不会保存或检索历史记忆")
+        elif self.llm_provider == "modelscope":
+            # 对于魔搭社区模型，使用硅基流动的BAAI/bge-m3嵌入模型
+            siliconflow_key = os.getenv('SILICONFLOW_API_KEY')
+            if siliconflow_key:
+                try:
+                    # 初始化硅基流动客户端
+                    self.client = OpenAI(
+                        api_key=siliconflow_key,
+                        base_url="https://api.siliconflow.cn/v1"
+                    )
+                    self.embedding = "BAAI/bge-m3"
+                    logger.info(f"✅ 使用硅基流动BAAI/bge-m3嵌入模型")
+                except Exception as e:
+                    logger.error(f"❌ 硅基流动嵌入初始化失败: {e}")
+                    # 降级到阿里百炼嵌入
+                    dashscope_key = os.getenv('DASHSCOPE_API_KEY')
+                    if dashscope_key:
+                        try:
+                            import dashscope
+                            from dashscope import TextEmbedding
+                            dashscope.api_key = dashscope_key
+                            self.embedding = "text-embedding-v3"
+                            self.client = None
+                            logger.info(f"💡 降级到阿里百炼嵌入服务")
+                        except Exception as e:
+                            logger.error(f"❌ 阿里百炼嵌入初始化失败: {e}")
+                            self.client = "DISABLED"
+                    else:
+                        self.client = "DISABLED"
+            else:
+                # 没有硅基流动密钥，尝试使用阿里百炼嵌入
+                dashscope_key = os.getenv('DASHSCOPE_API_KEY')
+                if dashscope_key:
+                    try:
+                        import dashscope
+                        from dashscope import TextEmbedding
+                        dashscope.api_key = dashscope_key
+                        self.embedding = "text-embedding-v3"
+                        self.client = None
+                        logger.info(f"💡 ModelScope使用阿里百炼嵌入服务")
+                    except Exception as e:
+                        logger.error(f"❌ 阿里百炼嵌入初始化失败: {e}")
+                        self.client = "DISABLED"
+                else:
+                    # 没有DashScope密钥，禁用记忆功能
+                    self.client = "DISABLED"
+                    logger.warning(f"⚠️ ModelScope未找到DASHSCOPE_API_KEY，记忆功能已禁用")
+                    logger.info(f"💡 系统将继续运行，但不会保存或检索历史记忆")
         elif config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
             self.client = OpenAI(base_url=config["backend_url"])

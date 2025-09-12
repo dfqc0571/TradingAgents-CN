@@ -209,8 +209,8 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow","custom_openai"],
-            index=["dashscope", "deepseek", "google", "openai", "openrouter","siliconflow", "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "modelscope", "custom_openai"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "modelscope", "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "modelscope", "custom_openai"] else 0,
             format_func=lambda x: {
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
@@ -218,6 +218,7 @@ def render_sidebar():
                 "openai": "🤖 OpenAI",
                 "openrouter": "🌐 OpenRouter",
                 "siliconflow": "🇨🇳 硅基流动",
+                "modelscope": "🇨🇳 魔搭社区",
                 "custom_openai": "🔧 自定义OpenAI端点"
             }[x],
             help="选择AI模型提供商",
@@ -301,7 +302,33 @@ def render_sidebar():
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+        elif llm_provider == "modelscope":
+            modelscope_options = ["Qwen/Qwen3-235B-A22B-Thinking-2507"]
 
+            # 获取当前选择的索引
+            current_index = 0
+            if st.session_state.llm_model in modelscope_options:
+                current_index = modelscope_options.index(st.session_state.llm_model)
+
+            llm_model = st.selectbox(
+                "选择魔搭社区模型",
+                options=modelscope_options,
+                index=current_index,
+                format_func=lambda x: {
+                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型"
+                }[x],
+                help="选择用于分析的魔搭社区模型",
+                key="modelscope_model_select"
+            )
+
+            # 更新session state和持久化存储
+            if st.session_state.llm_model != llm_model:
+                logger.debug(f"🔄 [Persistence] ModelScope模型变更: {st.session_state.llm_model} → {llm_model}")
+            st.session_state.llm_model = llm_model
+            logger.debug(f"💾 [Persistence] ModelScope模型已保存: {llm_model}")
+
+            # 保存到持久化存储
+            save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
         elif llm_provider == "deepseek":
             deepseek_options = ["deepseek-chat"]
 

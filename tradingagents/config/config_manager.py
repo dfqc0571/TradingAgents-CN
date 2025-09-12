@@ -256,6 +256,8 @@ class ConfigManager:
                 PricingConfig("google", "gemini-2.5-flash-lite-preview-06-17", 0.00025, 0.0005, "USD"),
                 PricingConfig("google", "gemini-pro", 0.00025, 0.0005, "USD"),
                 PricingConfig("google", "gemini-pro-vision", 0.00025, 0.0005, "USD"),
+                # ModelScope定价 (人民币)
+                PricingConfig("modelscope", "Qwen/Qwen3-235B-A22B-Thinking-2507", 0.0, 0.0, "CNY"),
             ]
             self.save_pricing(default_pricing)
         

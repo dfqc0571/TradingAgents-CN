@@ -181,6 +181,32 @@ class TradingAgentsGraph:
                 )
 
             logger.info(f"✅ [DeepSeek] 已启用token统计功能")
+        elif (self.config["llm_provider"].lower() == "modelscope" or
+              "modelscope" in self.config["llm_provider"].lower()):
+            # ModelScope配置 - 使用OpenAI兼容适配器
+            from tradingagents.llm_adapters.openai_compatible_base import create_openai_compatible_llm
+            
+            modelscope_api_key = os.getenv('MODELSCOPE_API_KEY')
+            if not modelscope_api_key:
+                raise ValueError("使用魔搭社区需要设置MODELSCOPE_API_KEY环境变量")
+
+            logger.info(f"🔧 [魔搭社区] 使用API密钥: {modelscope_api_key[:20]}...")
+
+            # 使用OpenAI兼容适配器创建LLM实例
+            self.deep_thinking_llm = create_openai_compatible_llm(
+                provider="modelscope",
+                model=self.config["deep_think_llm"],
+                temperature=0.1,
+                max_tokens=2000
+            )
+            self.quick_thinking_llm = create_openai_compatible_llm(
+                provider="modelscope",
+                model=self.config["quick_think_llm"],
+                temperature=0.1,
+                max_tokens=2000
+            )
+            
+            logger.info(f"✅ [魔搭社区] 已配置魔搭社区端点")
         elif self.config["llm_provider"].lower() == "custom_openai":
             # 自定义OpenAI端点配置
             from tradingagents.llm_adapters.openai_compatible_base import create_openai_compatible_llm

@@ -2,12 +2,12 @@
 """
 TradingAgents-CN 核心模块
 
-这是一个基于多智能体的股票分析系统，支持A股、港股和美股的综合分析。
+这是一个基于多智能体的股票分析系统，支持A股、港股和美股的综合分析。       
 """
 
 __version__ = "0.1.8"
 __author__ = "TradingAgents-CN Team"
-__description__ = "Multi-agent stock analysis system for Chinese markets"
+__description__ = "Multi-agent stock analysis system for Chinese markets" 
 
 # 导入核心模块
 try:
@@ -17,8 +17,16 @@ except ImportError:
     # 如果导入失败，不影响模块的基本功能
     pass
 
+def demo_function():
+    """
+    演示可编辑包功能的示例函数
+    这个函数用于展示当我们修改源代码时，无需重新安装包就能看到效果
+    """
+    return "这是修改后的版本！可编辑包的魔力就在这里！"
+
 __all__ = [
     "__version__",
-    "__author__", 
-    "__description__"
+    "__author__",
+    "__description__",
+    "demo_function"
 ]
