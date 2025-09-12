@@ -1,3 +1,79 @@
+# TradingAgents-ModelScope
+
+基于TradingAgents-CN项目，集成了魔搭社区(ModelScope)和硅基流动(SiliconFlow)模型支持的版本。
+
+## 特性
+
+- 使用魔搭社区的Qwen/Qwen3-235B-A22B-Thinking-2507模型作为默认LLM
+- 集成硅基流动的BAAI/bge-m3嵌入模型用于记忆功能
+- 保留了原有的多种模型提供商支持（阿里百炼、DeepSeek等）
+- 完整的股票分析功能，支持美股、A股和港股分析
+
+## 配置要求
+
+在使用此版本之前，请确保您已在`.env`文件中配置以下API密钥：
+
+```env
+# 魔搭社区 API 密钥 (必需)
+MODELSCOPE_API_KEY=your_modelscope_api_key_here
+
+# FinnHub API 密钥 (必需，用于获取美股金融数据)
+FINNHUB_API_KEY=your_finnhub_api_key_here
+
+# 硅基流动 API 密钥 (用于嵌入模型)
+SILICONFLOW_API_KEY=your_siliconflow_api_key_here
+```
+
+## 安装和运行
+
+1. 克隆仓库:
+   ```bash
+   git clone https://github.com/dfqc0571/TradingAgents-ModelScope.git
+   cd TradingAgents-ModelScope
+   ```
+
+2. 创建虚拟环境:
+   ```bash
+   python -m venv env
+   source env/bin/activate  # Linux/macOS
+   # 或
+   env\Scripts\activate  # Windows
+   ```
+
+3. 安装依赖:
+   ```bash
+   pip install -e .
+   ```
+
+4. 配置环境变量:
+   ```bash
+   cp .env.example .env
+   # 编辑 .env 文件，填入您的API密钥
+   ```
+
+5. 运行Web应用:
+   ```bash
+   streamlit run start_web.py
+   ```
+
+## 模型提供商选择
+
+在Web界面中，您可以选择以下LLM提供商：
+- 魔搭社区 (ModelScope) - 默认选择
+- 阿里百炼 (DashScope)
+- DeepSeek
+- 硅基流动 (SiliconFlow)
+- OpenAI
+- OpenRouter
+- Google AI
+- 自定义OpenAI端点
+
+## 注意事项
+
+- 本仓库为私有仓库，仅您自己可以访问
+- 所有敏感信息（如API密钥）都存储在`.env`文件中，该文件不会被提交到Git仓库
+- 默认配置已更新为使用魔搭社区的Qwen/Qwen3-235B-A22B-Thinking-2507模型
+
 # TradingAgents 中文增强版
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
