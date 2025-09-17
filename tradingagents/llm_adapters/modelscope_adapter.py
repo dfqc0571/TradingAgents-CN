@@ -4,7 +4,9 @@
 """
 
 import os
-from typing import Optional
+from typing import Optional, Sequence, Union, Dict, Any, List
+from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -42,8 +44,51 @@ class ChatModelScope:
             max_tokens=max_tokens,
             **kwargs
         )
+        
+        # 保存模型名称以供后续使用
+        self.model_name = model
 
         logger.info(f"✅ [魔搭社区] 已配置魔搭社区端点")
+
+    def bind_tools(
+        self,
+        tools: Sequence[Union[Dict[str, Any], type, BaseTool]],
+        **kwargs: Any,
+    ):
+        """绑定工具到模型，但检查模型是否支持工具调用"""
+        # 检查模型是否支持工具调用
+        from .openai_compatible_base import OPENAI_COMPATIBLE_PROVIDERS
+        models_config = OPENAI_COMPATIBLE_PROVIDERS.get("modelscope", {}).get("models", {})
+        model_info = models_config.get(self.model_name, {})
+        supports_function_calling = model_info.get("supports_function_calling", False)
+        
+        if not supports_function_calling:
+            logger.warning(f"⚠️ 模型 {self.model_name} 不支持工具调用，将使用模拟工具调用")
+            # 返回一个带有模拟工具调用功能的实例
+            return self._create_mock_tool_binding(tools)
+        
+        # 模型支持工具调用，正常绑定
+        return self.llm.bind_tools(tools, **kwargs)
+    
+    def _create_mock_tool_binding(self, tools: Sequence[Union[Dict[str, Any], type, BaseTool]]):
+        """为不支持工具调用的模型创建模拟工具绑定"""
+        # 创建工具描述列表
+        tool_descriptions = []
+        for tool in tools:
+            if hasattr(tool, "name") and hasattr(tool, "description"):
+                tool_descriptions.append({
+                    "name": tool.name,
+                    "description": tool.description
+                })
+            elif isinstance(tool, dict) and "name" in tool and "description" in tool:
+                tool_descriptions.append({
+                    "name": tool["name"],
+                    "description": tool["description"]
+                })
+        
+        # 保存工具信息
+        self._tool_descriptions = tool_descriptions
+        return self
 
     def __getattr__(self, name):
         """代理所有未定义的方法和属性到内部的LLM实例"""

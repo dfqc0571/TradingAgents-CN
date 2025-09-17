@@ -256,8 +256,43 @@ class ConfigManager:
                 PricingConfig("google", "gemini-2.5-flash-lite-preview-06-17", 0.00025, 0.0005, "USD"),
                 PricingConfig("google", "gemini-pro", 0.00025, 0.0005, "USD"),
                 PricingConfig("google", "gemini-pro-vision", 0.00025, 0.0005, "USD"),
-                # ModelScope定价 (人民币)
-                PricingConfig("modelscope", "Qwen/Qwen3-235B-A22B-Thinking-2507", 0.0, 0.0, "CNY"),
+                # 魔搭社区 (ModelScope) 模型定价 - 与阿里云百炼共享定价
+                # 参考: https://help.aliyun.com/zh/bailian/developer-reference/pricing-of-qwen-series-models
+                {
+                    "provider": "modelscope",
+                    "model_name": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+                    "input_price_per_ktoken": 0.001,    # 输入价格：1元 / 1K tokens
+                    "output_price_per_ktoken": 0.001,   # 输出价格：1元 / 1K tokens
+                    "price_unit": "yuan"
+                },
+                {
+                    "provider": "modelscope",
+                    "model_name": "Qwen/Qwen3-30B-A3B-Thinking-2507",
+                    "input_price_per_ktoken": 0.001,    # 输入价格：1元 / 1K tokens
+                    "output_price_per_ktoken": 0.001,   # 输出价格：1元 / 1K tokens
+                    "price_unit": "yuan"
+                },
+                {
+                    "provider": "modelscope",
+                    "model_name": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+                    "input_price_per_ktoken": 0.001,    # 输入价格：1元 / 1K tokens
+                    "output_price_per_ktoken": 0.001,   # 输出价格：1元 / 1K tokens
+                    "price_unit": "yuan"
+                },
+                {
+                    "provider": "modelscope",
+                    "model_name": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+                    "input_price_per_ktoken": 0.001,    # 输入价格：1元 / 1K tokens
+                    "output_price_per_ktoken": 0.001,   # 输出价格：1元 / 1K tokens
+                    "price_unit": "yuan"
+                },
+                {
+                    "provider": "modelscope",
+                    "model_name": "ZhipuAI/GLM-4.5",
+                    "input_price_per_ktoken": 0.001,    # 输入价格：1元 / 1K tokens
+                    "output_price_per_ktoken": 0.001,   # 输出价格：1元 / 1K tokens
+                    "price_unit": "yuan"
+                },
             ]
             self.save_pricing(default_pricing)
         

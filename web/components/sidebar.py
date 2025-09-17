@@ -128,7 +128,7 @@ def render_sidebar():
         font-size: 0.75rem !important;
     }
 
-    /* 优化markdown文本 */
+    /* 优化代码文本 */
     section[data-testid="stSidebar"] .stMarkdown {
         margin-bottom: 0.3rem !important;
         padding: 0 !important;
@@ -303,7 +303,13 @@ def render_sidebar():
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
         elif llm_provider == "modelscope":
-            modelscope_options = ["Qwen/Qwen3-235B-A22B-Thinking-2507"]
+            modelscope_options = [
+                "Qwen/Qwen3-235B-A22B-Thinking-2507",
+                "Qwen/Qwen3-30B-A3B-Thinking-2507", 
+                "Qwen/Qwen3-Next-80B-A3B-Thinking",
+                "Qwen/Qwen3-Next-80B-A3B-Instruct",
+                "ZhipuAI/GLM-4.5"  # 替换DeepSeek-V3.1为GLM-4.5
+            ]
 
             # 获取当前选择的索引
             current_index = 0
@@ -315,7 +321,11 @@ def render_sidebar():
                 options=modelscope_options,
                 index=current_index,
                 format_func=lambda x: {
-                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型"
+                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型",
+                    "Qwen/Qwen3-30B-A3B-Thinking-2507": "Qwen3-30B-A3B-Thinking-2507 - 30B思维链模型",
+                    "Qwen/Qwen3-Next-80B-A3B-Thinking": "Qwen3-Next-80B-A3B-Thinking - 80B思维链模型",
+                    "Qwen/Qwen3-Next-80B-A3B-Instruct": "Qwen3-Next-80B-A3B-Instruct - 80B指令模型",
+                    "ZhipuAI/GLM-4.5": "GLM-4.5 - 智谱AI"
                 }[x],
                 help="选择用于分析的魔搭社区模型",
                 key="modelscope_model_select"
@@ -330,29 +340,40 @@ def render_sidebar():
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
         elif llm_provider == "deepseek":
-            deepseek_options = ["deepseek-chat"]
+            # 魔搭社区模型选项
+            MODELSCOPE_MODELS = [
+                "Qwen/Qwen3-235B-A22B-Thinking-2507",  # 默认选中
+                "Qwen/Qwen3-30B-A3B-Thinking-2507",
+                "Qwen/Qwen3-Next-80B-A3B-Thinking",
+                "Qwen/Qwen3-Next-80B-A3B-Instruct",
+                "ZhipuAI/GLM-4.5"  # 新增GLM-4.5模型
+            ]
 
             # 获取当前选择的索引
             current_index = 0
-            if st.session_state.llm_model in deepseek_options:
-                current_index = deepseek_options.index(st.session_state.llm_model)
+            if st.session_state.llm_model in MODELSCOPE_MODELS:
+                current_index = MODELSCOPE_MODELS.index(st.session_state.llm_model)
 
             llm_model = st.selectbox(
-                "选择DeepSeek模型",
-                options=deepseek_options,
+                "选择魔搭社区模型",
+                options=MODELSCOPE_MODELS,
                 index=current_index,
                 format_func=lambda x: {
-                    "deepseek-chat": "DeepSeek Chat - 通用对话模型，适合股票分析"
+                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型",
+                    "Qwen/Qwen3-30B-A3B-Thinking-2507": "Qwen3-30B-A3B-Thinking-2507 - 30B思维链模型",
+                    "Qwen/Qwen3-Next-80B-A3B-Thinking": "Qwen3-Next-80B-A3B-Thinking - 80B思维链模型",
+                    "Qwen/Qwen3-Next-80B-A3B-Instruct": "Qwen3-Next-80B-A3B-Instruct - 80B指令模型",
+                    "ZhipuAI/GLM-4.5": "GLM-4.5 - 智谱AI"
                 }[x],
-                help="选择用于分析的DeepSeek模型",
-                key="deepseek_model_select"
+                help="选择用于分析的魔搭社区模型",
+                key="modelscope_model_select"
             )
 
             # 更新session state和持久化存储
             if st.session_state.llm_model != llm_model:
-                logger.debug(f"🔄 [Persistence] DeepSeek模型变更: {st.session_state.llm_model} → {llm_model}")
+                logger.debug(f"🔄 [Persistence] ModelScope模型变更: {st.session_state.llm_model} → {llm_model}")
             st.session_state.llm_model = llm_model
-            logger.debug(f"💾 [Persistence] DeepSeek模型已保存: {llm_model}")
+            logger.debug(f"💾 [Persistence] ModelScope模型已保存: {llm_model}")
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
