@@ -21,6 +21,7 @@ if dataflows_path not in sys.path:
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
+logger = get_logger('api.stock')
 
 try:
     from stock_data_service import get_stock_data_service
@@ -165,7 +166,7 @@ def get_market_summary() -> Dict[str, Any]:
     
     Example:
         >>> summary = get_market_summary()
-        logger.info(f"沪市股票数量: {summary["shanghai_count']}")
+        logger.info(f"沪市股票数量: {summary["shanghai_count"]}")
     """
     all_stocks = get_all_stocks()
     
@@ -199,6 +200,7 @@ def get_market_summary() -> Dict[str, Any]:
         'shanghai_count': shanghai_count,
         'shenzhen_count': shenzhen_count,
         'category_stats': category_stats,
+        'category_stats': category_stats,
         'data_source': all_stocks[0].get('source', 'unknown') if all_stocks else 'unknown',
         'updated_at': datetime.now().isoformat()
     }
@@ -212,7 +214,7 @@ def check_service_status() -> Dict[str, Any]:
     
     Example:
         >>> status = check_service_status()
-        logger.info(f"MongoDB状态: {status["mongodb_status']}")
+        logger.info(f"MongoDB状态: {status["mongodb_status"]}")
     """
     if not SERVICE_AVAILABLE:
         return {
@@ -225,7 +227,8 @@ def check_service_status() -> Dict[str, Any]:
     
     # 检查MongoDB状态
     mongodb_status = 'disconnected'
-    if service.db_manager and service.db_manager.mongodb_db:
+    # 修复数据库管理器属性访问问题
+    if hasattr(service, 'db_manager') and service.db_manager and hasattr(service.db_manager, 'mongodb_db') and service.db_manager.mongodb_db:
         try:
             # 尝试执行一个简单的查询来测试连接
             service.db_manager.mongodb_db.list_collection_names()
@@ -235,7 +238,7 @@ def check_service_status() -> Dict[str, Any]:
     
     # 检查Tushare数据接口状态
     tdx_status = 'unavailable'
-    if service.tdx_provider:
+    if hasattr(service, 'tdx_provider') and service.tdx_provider:
         try:
             # 尝试获取一个股票名称来测试API
             test_name = service.tdx_provider._get_stock_name('000001')
