@@ -27,6 +27,12 @@ except ImportError:
     TDX_AVAILABLE = False
 
 try:
+    from .akshare_utils import get_akshare_provider, AKShareProvider
+    AKSHARE_AVAILABLE = True
+except ImportError:
+    AKSHARE_AVAILABLE = False
+
+try:
     import sys
     import os
     # 添加utils目录到路径
@@ -49,6 +55,7 @@ class StockDataService:
     def __init__(self):
         self.db_manager = None
         self.tdx_provider = None
+        self.akshare_provider = None
         self._init_services()
     
     def _init_services(self):
@@ -73,6 +80,15 @@ class StockDataService:
             except Exception as e:
                 logger.error(f"⚠️ Tushare数据接口初始化失败: {e}")
                 self.tdx_provider = None
+        
+        # 尝试初始化AKShare提供器
+        if AKSHARE_AVAILABLE:
+            try:
+                self.akshare_provider = get_akshare_provider()
+                logger.info(f"✅ AKShare数据接口初始化成功")
+            except Exception as e:
+                logger.error(f"⚠️ AKShare数据接口初始化失败: {e}")
+                self.akshare_provider = None
     
     def get_stock_basic_info(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
         """
@@ -96,9 +112,24 @@ class StockDataService:
             except Exception as e:
                 logger.error(f"⚠️ MongoDB查询失败: {e}")
         
-        # 2. 降级到Tushare数据接口
-        logger.info(f"🔄 MongoDB不可用，降级到Tushare数据接口")
-        if ENHANCED_FETCHER_AVAILABLE:
+        # 2. 优先使用AKShare（如果可用且配置为默认数据源）
+        logger.info(f"🔄 MongoDB不可用，检查是否使用AKShare")
+        if self.akshare_provider is not None and os.getenv('DEFAULT_CHINA_DATA_SOURCE', '').lower() == 'akshare':
+            try:
+                result = self._get_from_akshare(stock_code)
+                if result:
+                    logger.info(f"✅ 从AKShare获取成功: {len(result) if isinstance(result, list) else 1}条记录")
+                    # 尝试缓存到MongoDB（如果可用）
+                    self._cache_to_mongodb(result)
+                    return result
+            except Exception as e:
+                logger.error(f"⚠️ AKShare查询失败: {e}")
+        else:
+            logger.info(f"🔄 AKShare不可用或未配置为默认数据源")
+        
+        # 3. 降级到Tushare数据接口
+        logger.info(f"🔄 降级到Tushare数据接口")
+        if self.tdx_provider is not None:
             try:
                 result = self._get_from_tdx_api(stock_code)
                 if result:
@@ -109,7 +140,7 @@ class StockDataService:
             except Exception as e:
                 logger.error(f"⚠️ Tushare数据接口查询失败: {e}")
         
-        # 3. 最后的降级方案
+        # 4. 最后的降级方案
         logger.error(f"❌ 所有数据源都不可用")
         return self._get_fallback_data(stock_code)
     
@@ -178,14 +209,62 @@ class StockDataService:
         except Exception as e:
             logger.error(f"Tushare数据接口查询失败: {e}")
             return None
+
+    def _get_from_akshare(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
+        """从AKShare获取数据"""
+        try:
+            if stock_code:
+                # 获取单个股票信息
+                if self.akshare_provider:
+                    stock_info = self.akshare_provider.get_stock_info(stock_code)
+                    if stock_info:
+                        return {
+                            'code': stock_code,
+                            'name': stock_info.get('name', f'股票{stock_code}'),
+                            'market': self._get_market_name(stock_code),
+                            'category': self._get_stock_category(stock_code),
+                            'source': 'akshare',
+                            'updated_at': datetime.now().isoformat()
+                        }
+            else:
+                # 获取所有股票列表
+                # 注意：AKShare没有直接获取所有股票列表的API，所以我们降级到Tushare
+                stock_df = enhanced_fetch_stock_list(
+                    type_='stock',
+                    enable_server_failover=True,
+                    max_retries=3
+                )
+                
+                if stock_df is not None and not stock_df.empty:
+                    # 转换为字典列表
+                    results = []
+                    for _, row in stock_df.iterrows():
+                        results.append({
+                            'code': row.get('code', ''),
+                            'name': row.get('name', ''),
+                            'market': row.get('market', ''),
+                            'category': row.get('category', ''),
+                            'source': 'akshare_enhanced',
+                            'updated_at': datetime.now().isoformat()
+                        })
+                    return results
+                    
+        except Exception as e:
+            logger.error(f"AKShare查询失败: {e}")
+            return None
     
     def _cache_to_mongodb(self, data: Any) -> bool:
         """将数据缓存到MongoDB"""
-        if not self.db_manager or not self.db_manager.mongodb_db:
+        if not self.db_manager or not self.db_manager.get_mongodb_client():
             return False
         
         try:
-            collection = self.db_manager.mongodb_db['stock_basic_info']
+            mongodb_client = self.db_manager.get_mongodb_client()
+            if not mongodb_client:
+                return False
+                
+            db = mongodb_client[self.db_manager.mongodb_config["database"]]
+            collection = db['stock_basic_info']
             
             if isinstance(data, list):
                 # 批量插入
@@ -265,6 +344,18 @@ class StockDataService:
         if stock_info and 'error' in stock_info:
             return f"❌ 无法获取股票{stock_code}的基础信息: {stock_info.get('error', '未知错误')}"
         
+        # 优先使用AKShare获取数据（如果配置为默认数据源）
+        if AKSHARE_AVAILABLE and os.getenv('DEFAULT_CHINA_DATA_SOURCE', '').lower() == 'akshare':
+            try:
+                if self.akshare_provider:
+                    # 使用AKShare获取股票数据
+                    data = self.akshare_provider.get_stock_data(stock_code, start_date, end_date)
+                    if data is not None and not data.empty:
+                        # 格式化数据为字符串
+                        return self._format_akshare_stock_data(stock_code, data, start_date, end_date)
+            except Exception as e:
+                logger.warning(f"⚠️ AKShare获取股票数据失败: {e}")
+        
         # 调用现有的get_china_stock_data函数
         try:
             from .tdx_utils import get_china_stock_data
@@ -272,6 +363,75 @@ class StockDataService:
             return get_china_stock_data(stock_code, start_date, end_date)
         except Exception as e:
             return f"❌ 获取股票数据失败: {str(e)}\n\n💡 建议：\n1. 检查网络连接\n2. 确认股票代码格式正确\n3. 检查MongoDB配置"
+
+    def _format_akshare_stock_data(self, stock_code: str, data: pd.DataFrame, start_date: str, end_date: str) -> str:
+        """
+        格式化AKShare股票数据为文本格式
+        
+        Args:
+            stock_code: 股票代码
+            data: 股票数据DataFrame
+            start_date: 开始日期
+            end_date: 结束日期
+            
+        Returns:
+            str: 格式化的股票数据文本
+        """
+        if data is None or data.empty:
+            return f"❌ 无法获取股票 {stock_code} 的AKShare数据"
+
+        try:
+            # 获取股票基本信息
+            stock_name = f'股票{stock_code}'  # 默认名称
+            if self.akshare_provider:
+                stock_info = self.akshare_provider.get_stock_info(stock_code)
+                stock_name = stock_info.get('name', f'股票{stock_code}')
+            
+            # 计算统计信息
+            latest_price = data['收盘'].iloc[-1]
+            price_change = data['收盘'].iloc[-1] - data['收盘'].iloc[0]
+            price_change_pct = (price_change / data['收盘'].iloc[0]) * 100
+
+            avg_volume = data['成交量'].mean() if '成交量' in data.columns else 0
+            max_price = data['最高'].max()
+            min_price = data['最低'].min()
+
+            # 格式化输出
+            formatted_text = f"""
+📊 股票数据报告 (AKShare)
+================
+
+股票信息:
+- 代码: {stock_code}
+- 名称: {stock_name}
+- 市场: {self._get_market_name(stock_code)}
+
+价格信息:
+- 最新价格: ¥{latest_price:.2f}
+- 期间涨跌: ¥{price_change:+.2f} ({price_change_pct:+.2f}%)
+- 期间最高: ¥{max_price:.2f}
+- 期间最低: ¥{min_price:.2f}
+
+交易信息:
+- 数据期间: {start_date} 至 {end_date}
+- 交易天数: {len(data)}天
+- 平均成交量: {avg_volume:,.0f}股
+
+最近5个交易日:
+"""
+
+            # 添加最近5天的数据
+            recent_data = data.tail(5)
+            for _, row in recent_data.iterrows():
+                formatted_text += f"- {row['日期']}: 开盘¥{row['开盘']:.2f}, 收盘¥{row['收盘']:.2f}, 成交量{row['成交量']:,.0f}\n"
+
+            formatted_text += f"\n数据来源: AKShare\n"
+
+            return formatted_text
+
+        except Exception as e:
+            logger.error(f"❌ 格式化AKShare股票数据失败: {e}")
+            return f"❌ AKShare股票数据格式化失败: {stock_code}"
 
 # 全局服务实例
 _stock_data_service = None

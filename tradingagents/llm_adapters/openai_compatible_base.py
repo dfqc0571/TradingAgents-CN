@@ -300,7 +300,8 @@ OPENAI_COMPATIBLE_PROVIDERS = {
             "Qwen/Qwen3-30B-A3B-Thinking-2507": {"context_length": 32768, "supports_function_calling": True},
             "Qwen/Qwen3-Next-80B-A3B-Thinking": {"context_length": 32768, "supports_function_calling": True},
             "Qwen/Qwen3-Next-80B-A3B-Instruct": {"context_length": 32768, "supports_function_calling": True},
-            "ZhipuAI/GLM-4.5": {"context_length": 128000, "supports_function_calling": True}
+            "ZhipuAI/GLM-4.5": {"context_length": 128000, "supports_function_calling": True},
+            "ZhipuAI/GLM-4.6": {"context_length": 128000, "supports_function_calling": True}
         }
     },
     "custom_openai": {

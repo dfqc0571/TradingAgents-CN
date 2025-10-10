@@ -24,7 +24,7 @@ from tradingagents.utils.logging_init import get_logger
 logger = get_logger('api.stock')
 
 try:
-    from stock_data_service import get_stock_data_service
+    from tradingagents.dataflows.stock_data_service import get_stock_data_service
 
     SERVICE_AVAILABLE = True
 except ImportError as e:

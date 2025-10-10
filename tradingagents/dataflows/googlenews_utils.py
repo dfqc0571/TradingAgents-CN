@@ -1,129 +1,148 @@
-import json
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+谷歌新闻数据获取工具
+支持中文新闻搜索和处理
+"""
+
+import sys
+import os
 import time
-import random
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    retry_if_result,
-)
+from datetime import datetime, timedelta
+import logging
+from typing import List, Dict, Optional
 
-# 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('agents')
+# 添加项目根目录到路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger('dataflows.googlenews')
 
-def is_rate_limited(response):
-    """Check if the response indicates rate limiting (status code 429)"""
-    return response.status_code == 429
+# 尝试导入tenacity，如果不可用则使用简单重试机制
+try:
+    from tenacity import (
+        retry,
+        stop_after_attempt,
+        wait_exponential,
+        retry_if_exception_type
+    )
+    TENACITY_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ tenacity库不可用，将使用简单重试机制")
+    TENACITY_AVAILABLE = False
 
+# 尝试导入Google News API
+try:
+    from GoogleNews import GoogleNews
+    GOOGLE_NEWS_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ GoogleNews库不可用")
+    GOOGLE_NEWS_AVAILABLE = False
 
-@retry(
-    retry=(retry_if_result(is_rate_limited) | retry_if_exception_type(requests.exceptions.ConnectionError) | retry_if_exception_type(requests.exceptions.Timeout)),
-    wait=wait_exponential(multiplier=1, min=4, max=60),
-    stop=stop_after_attempt(5),
-)
-def make_request(url, headers):
-    """Make a request with retry logic for rate limiting and connection issues"""
-    # Random delay before each request to avoid detection
-    time.sleep(random.uniform(2, 6))
-    # 添加超时参数，设置连接超时和读取超时
-    response = requests.get(url, headers=headers, timeout=(10, 30))  # 连接超时10秒，读取超时30秒
-    return response
-
-
-def getNewsData(query, start_date, end_date):
+def getNewsData(stock_name: str, days: int = 30) -> List[Dict[str, str]]:
     """
-    Scrape Google News search results for a given query and date range.
-    query: str - search query
-    start_date: str - start date in the format yyyy-mm-dd or mm/dd/yyyy
-    end_date: str - end date in the format yyyy-mm-dd or mm/dd/yyyy
+    获取指定股票相关的新闻数据
+    
+    Args:
+        stock_name: 股票名称
+        days: 获取最近几天的新闻，默认30天
+    
+    Returns:
+        List[Dict]: 新闻数据列表，每条新闻包含title、link、date等字段
     """
-    if "-" in start_date:
-        start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        start_date = start_date.strftime("%m/%d/%Y")
-    if "-" in end_date:
-        end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        end_date = end_date.strftime("%m/%d/%Y")
-
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/101.0.4951.54 Safari/537.36"
-        )
-    }
-
-    news_results = []
-    page = 0
-    while True:
-        offset = page * 10
-        url = (
-            f"https://www.google.com/search?q={query}"
-            f"&tbs=cdr:1,cd_min:{start_date},cd_max:{end_date}"
-            f"&tbm=nws&start={offset}"
-        )
-
-        try:
-            response = make_request(url, headers)
-            soup = BeautifulSoup(response.content, "html.parser")
-            results_on_page = soup.select("div.SoaBEf")
-
-            if not results_on_page:
-                break  # No more results found
-
-            for el in results_on_page:
+    if not GOOGLE_NEWS_AVAILABLE:
+        logger.warning(f"❌ Google News API不可用，无法获取{stock_name}的新闻数据")
+        return []
+    
+    try:
+        # 计算日期范围
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # 格式化日期
+        start_date_str = start_date.strftime("%m/%d/%Y")
+        end_date_str = end_date.strftime("%m/%d/%Y")
+        
+        logger.info(f"🔍 搜索{stock_name}的新闻，时间范围: {start_date_str} - {end_date_str}")
+        
+        # 创建GoogleNews实例
+        googlenews = GoogleNews(lang='zh', start=start_date_str, end=end_date_str)
+        googlenews.setencode('utf-8')
+        
+        # 搜索关键词
+        search_query = f"{stock_name} 股票 OR 股价 OR 投资"
+        logger.info(f"🔍 搜索关键词: {search_query}")
+        
+        # 根据是否有tenacity使用不同的重试机制
+        if TENACITY_AVAILABLE:
+            @retry(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=4, max=10),
+                retry=retry_if_exception_type(Exception)
+            )
+            def _search_with_retry():
+                googlenews.search(search_query)
+                return googlenews.result()
+            
+            results = _search_with_retry()
+        else:
+            # 简单重试机制
+            results = None
+            for attempt in range(3):
                 try:
-                    link = el.find("a")["href"]
-                    title = el.select_one("div.MBeuO").get_text()
-                    snippet = el.select_one(".GI74Re").get_text()
-                    date = el.select_one(".LfVVr").get_text()
-                    source = el.select_one(".NUnG9d span").get_text()
-                    news_results.append(
-                        {
-                            "link": link,
-                            "title": title,
-                            "snippet": snippet,
-                            "date": date,
-                            "source": source,
-                        }
-                    )
+                    googlenews.search(search_query)
+                    results = googlenews.result()
+                    break
                 except Exception as e:
-                    logger.error(f"Error processing result: {e}")
-                    # If one of the fields is not found, skip this result
-                    continue
+                    logger.warning(f"第{attempt+1}次尝试失败: {e}")
+                    if attempt < 2:  # 不是最后一次尝试
+                        time.sleep(2 ** attempt)  # 指数退避
+                    else:
+                        raise  # 最后一次尝试失败则抛出异常
+        
+        if not results:
+            logger.info(f"🔍 未找到{stock_name}的相关新闻")
+            return []
+        
+        # 处理结果
+        news_list = []
+        for item in results[:10]:  # 限制最多10条新闻
+            news_item = {
+                'title': item.get('title', ''),
+                'link': item.get('link', ''),
+                'date': item.get('date', ''),
+                'desc': item.get('desc', ''),
+                'source': item.get('media', '')
+            }
+            news_list.append(news_item)
+        
+        logger.info(f"✅ 成功获取{len(news_list)}条{stock_name}的新闻")
+        return news_list
+        
+    except Exception as e:
+        logger.error(f"❌ 获取{stock_name}新闻时发生错误: {e}")
+        return []
 
-            # Update the progress bar with the current count of results scraped
+# 测试函数
+def test_news_fetch():
+    """测试新闻获取功能"""
+    print("🧪 测试新闻获取功能...")
+    
+    # 测试平安银行
+    news = getNewsData("平安银行", 7)
+    print(f"🔍 平安银行新闻数量: {len(news)}")
+    
+    if news:
+        print("📝 最新新闻:")
+        for i, item in enumerate(news[:3]):
+            print(f"  {i+1}. {item['title']}")
+            print(f"     日期: {item['date']}")
+            print(f"     来源: {item['source']}")
+            print()
 
-            # Check for the "Next" link (pagination)
-            next_link = soup.find("a", id="pnnext")
-            if not next_link:
-                break
-
-            page += 1
-
-        except requests.exceptions.Timeout as e:
-            logger.error(f"连接超时: {e}")
-            # 不立即中断，记录错误后继续尝试下一页
-            page += 1
-            if page > 3:  # 如果连续多页都超时，则退出循环
-                logger.error("多次连接超时，停止获取Google新闻")
-                break
-            continue
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"连接错误: {e}")
-            # 不立即中断，记录错误后继续尝试下一页
-            page += 1
-            if page > 3:  # 如果连续多页都连接错误，则退出循环
-                logger.error("多次连接错误，停止获取Google新闻")
-                break
-            continue
-        except Exception as e:
-            logger.error(f"获取Google新闻失败: {e}")
-            break
-
-    return news_results
+if __name__ == "__main__":
+    test_news_fetch()

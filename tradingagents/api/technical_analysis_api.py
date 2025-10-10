@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import pandas as pd
 import io
+import re
 
 # 添加项目根目录到路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -29,6 +30,53 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ 技术分析模块不可用: {e}")
     TECHNICAL_ANALYSIS_AVAILABLE = False
+
+def _parse_akshare_data_to_dataframe(stock_data_str: str) -> pd.DataFrame:
+    """
+    将AKShare获取的股票数据字符串解析为DataFrame格式，适配stockstats库的要求
+    
+    Args:
+        stock_data_str: AKShare返回的股票数据字符串
+        
+    Returns:
+        pd.DataFrame: 符合stockstats要求的DataFrame
+    """
+    lines = stock_data_str.strip().split('\n')
+    
+    # 查找数据开始行
+    data_start_idx = 0
+    for i, line in enumerate(lines):
+        if re.match(r'^\d{4}-\d{2}-\d{2}', line.strip()):
+            data_start_idx = i
+            break
+    
+    # 提取数据行
+    data_lines = lines[data_start_idx:]
+    
+    # 解析数据
+    parsed_data = []
+    for line in data_lines:
+        parts = line.split()
+        if len(parts) >= 11:  # 确保有足够的数据列
+            # 解析每行数据，适配stockstats需要的列名
+            parsed_data.append({
+                'Date': parts[0],        # 日期
+                'Open': float(parts[2]), # 开盘价
+                'High': float(parts[3]), # 最高价
+                'Low': float(parts[4]),  # 最低价
+                'Close': float(parts[5]),# 收盘价
+                'Volume': int(parts[6])  # 成交量
+            })
+    
+    # 创建DataFrame
+    df = pd.DataFrame(parsed_data)
+    
+    # 确保列名和数据类型正确
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.sort_values('Date')  # 按日期排序
+    df = df.reset_index(drop=True)
+    
+    return df
 
 def calculate_technical_indicators(
     stock_code: str, 
@@ -82,34 +130,7 @@ def calculate_technical_indicators(
             
             # 解析数据为DataFrame
             try:
-                # 将字符串转换为DataFrame
-                lines = stock_data_str.strip().split('\n')
-                # 跳过标题行，找到数据开始的位置
-                data_lines = []
-                for line in lines:
-                    if line.strip() and not line.startswith('日期') and not line.startswith('='):
-                        # 假设数据行包含日期格式
-                        if '-' in line and ':' not in line:  # 排除时间行
-                            data_lines.append(line)
-                
-                if not data_lines:
-                    return {
-                        'error': '无法解析股票数据',
-                        'code': stock_code,
-                        'suggestion': '数据格式不正确'
-                    }
-                
-                # 构造CSV格式数据
-                csv_data = "Date,Open,High,Low,Close,Volume\n"
-                for line in data_lines:
-                    parts = line.split()
-                    if len(parts) >= 6:
-                        # 重新组织数据格式
-                        csv_data += f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{parts[4]},{parts[5]}\n"
-                
-                # 读取为DataFrame
-                stock_data = pd.read_csv(io.StringIO(csv_data))
-                
+                stock_data = _parse_akshare_data_to_dataframe(stock_data_str)
             except Exception as parse_error:
                 logger.error(f"解析股票数据时发生错误: {parse_error}")
                 return {
@@ -118,12 +139,13 @@ def calculate_technical_indicators(
                     'suggestion': '请检查数据源'
                 }
             
-            # 保存数据到临时CSV文件
+            # 保存数据到临时CSV文件，使用stockstats期望的文件名格式
             if data_dir is None:
                 data_dir = os.path.join(project_root, 'data')
                 os.makedirs(data_dir, exist_ok=True)
             
-            temp_file = os.path.join(data_dir, f'{stock_code}_temp.csv')
+            # 使用stockstats期望的文件名格式
+            temp_file = os.path.join(data_dir, f'{stock_code}-YFin-data-2015-01-01-2025-03-25.csv')
             stock_data.to_csv(temp_file, index=False)
             
             # 计算技术指标
@@ -137,6 +159,12 @@ def calculate_technical_indicators(
                         data_dir=data_dir,
                         online=False
                     )
+                    # 如果是交易日问题，尝试获取最近的有效数据
+                    if value == "N/A: Not a trading day (weekend or holiday)":
+                        # 获取最近的交易日数据
+                        latest_value = _get_latest_trading_day_value(stock_data, indicator, date)
+                        if latest_value is not None:
+                            value = latest_value
                     results[indicator] = value
                 except Exception as e:
                     logger.warning(f"计算指标 {indicator} 失败: {e}")
@@ -175,14 +203,56 @@ def calculate_technical_indicators(
                 'indicators': results,
                 'status': 'success'
             }
-            
     except Exception as e:
         logger.error(f"计算技术指标时发生错误: {e}")
         return {
             'error': f'计算技术指标失败: {str(e)}',
             'code': stock_code,
-            'suggestion': '请检查股票代码和数据源'
+            'suggestion': '请检查数据源和网络连接'
         }
+
+def _get_latest_trading_day_value(stock_data: pd.DataFrame, indicator: str, target_date: str):
+    """
+    获取最近交易日的指标值
+    
+    Args:
+        stock_data: 股票数据DataFrame
+        indicator: 指标名称
+        target_date: 目标日期
+        
+    Returns:
+        Any: 最近交易日的指标值，如果找不到则返回None
+    """
+    try:
+        # 导入stockstats
+        from stockstats import wrap
+        
+        # 确保日期列是datetime类型
+        stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+        target_datetime = pd.to_datetime(target_date)
+        
+        # 过滤目标日期之前的数据
+        filtered_data = stock_data[stock_data['Date'] <= target_datetime].sort_values('Date', ascending=False)
+        
+        if filtered_data.empty:
+            return None
+            
+        # 使用stockstats计算指标
+        df = wrap(filtered_data)
+        
+        # 获取最近的交易日数据
+        if not df.empty:
+            # 确保指标列存在
+            if indicator in df.columns:
+                latest_value = df[indicator].iloc[0]
+                # 检查是否为有效数值
+                if pd.notna(latest_value) and latest_value != float('inf') and latest_value != float('-inf'):
+                    return float(latest_value)
+        
+        return None
+    except Exception as e:
+        logger.warning(f"获取最近交易日数据失败: {e}")
+        return None
 
 def get_trading_signals(stock_code: str, date: str = None) -> Dict[str, Any]:
     """

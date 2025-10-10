@@ -1,7 +1,7 @@
 import pandas as pd
 import yfinance as yf
 from stockstats import wrap
-from typing import Annotated
+from typing import Dict, Any
 import os
 from .config import get_config
 
@@ -9,21 +9,11 @@ from .config import get_config
 class StockstatsUtils:
     @staticmethod
     def get_stock_stats(
-        symbol: Annotated[str, "ticker symbol for the company"],
-        indicator: Annotated[
-            str, "quantitative indicators based off of the stock data for the company"
-        ],
-        curr_date: Annotated[
-            str, "curr date for retrieving stock price data, YYYY-mm-dd"
-        ],
-        data_dir: Annotated[
-            str,
-            "directory where the stock data is stored.",
-        ],
-        online: Annotated[
-            bool,
-            "whether to use online tools to fetch data or offline tools. If True, will use online tools.",
-        ] = False,
+        symbol: str,
+        indicator: str,
+        curr_date: str,
+        data_dir: str,
+        online: bool = False,
     ):
         df = None
         data = None
@@ -82,6 +72,9 @@ class StockstatsUtils:
 
         if not matching_rows.empty:
             indicator_value = matching_rows[indicator].values[0]
+            # 检查值是否有效
+            if pd.isna(indicator_value) or indicator_value == float('inf') or indicator_value == float('-inf'):
+                return "N/A: Not a trading day (weekend or holiday)"
             return indicator_value
         else:
             return "N/A: Not a trading day (weekend or holiday)"

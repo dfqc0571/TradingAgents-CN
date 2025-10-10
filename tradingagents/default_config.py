@@ -10,8 +10,8 @@ DEFAULT_CONFIG = {
     ),
     # LLM settings
     "llm_provider": "modelscope",
-    "deep_think_llm": "Qwen/Qwen3-235B-A22B-Thinking-2507",
-    "quick_think_llm": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+    "deep_think_llm": "ZhipuAI/GLM-4.5",
+    "quick_think_llm": "ZhipuAI/GLM-4.5",
     "backend_url": "https://api-inference.modelscope.cn/v1",
     # Debate and discussion settings
     "max_debate_rounds": 1,

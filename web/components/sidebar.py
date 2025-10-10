@@ -303,29 +303,32 @@ def render_sidebar():
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
         elif llm_provider == "modelscope":
-            modelscope_options = [
-                "Qwen/Qwen3-235B-A22B-Thinking-2507",
-                "Qwen/Qwen3-30B-A3B-Thinking-2507", 
+            # 魔搭社区模型选项
+            MODELSCOPE_MODELS = [
+                "Qwen/Qwen3-235B-A22B-Thinking-2507",  # 默认选中
+                "Qwen/Qwen3-30B-A3B-Thinking-2507",
                 "Qwen/Qwen3-Next-80B-A3B-Thinking",
                 "Qwen/Qwen3-Next-80B-A3B-Instruct",
-                "ZhipuAI/GLM-4.5"  # 替换DeepSeek-V3.1为GLM-4.5
+                "ZhipuAI/GLM-4.5",
+                "ZhipuAI/GLM-4.6"  # 新增GLM-4.6模型
             ]
 
             # 获取当前选择的索引
             current_index = 0
-            if st.session_state.llm_model in modelscope_options:
-                current_index = modelscope_options.index(st.session_state.llm_model)
+            if st.session_state.llm_model in MODELSCOPE_MODELS:
+                current_index = MODELSCOPE_MODELS.index(st.session_state.llm_model)
 
             llm_model = st.selectbox(
                 "选择魔搭社区模型",
-                options=modelscope_options,
+                options=MODELSCOPE_MODELS,
                 index=current_index,
                 format_func=lambda x: {
                     "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型",
                     "Qwen/Qwen3-30B-A3B-Thinking-2507": "Qwen3-30B-A3B-Thinking-2507 - 30B思维链模型",
                     "Qwen/Qwen3-Next-80B-A3B-Thinking": "Qwen3-Next-80B-A3B-Thinking - 80B思维链模型",
                     "Qwen/Qwen3-Next-80B-A3B-Instruct": "Qwen3-Next-80B-A3B-Instruct - 80B指令模型",
-                    "ZhipuAI/GLM-4.5": "GLM-4.5 - 智谱AI"
+                    "ZhipuAI/GLM-4.5": "GLM-4.5 - 智谱AI",
+                    "ZhipuAI/GLM-4.6": "GLM-4.6 - 智谱AI最新模型"
                 }[x],
                 help="选择用于分析的魔搭社区模型",
                 key="modelscope_model_select"

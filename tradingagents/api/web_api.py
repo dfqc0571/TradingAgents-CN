@@ -51,6 +51,8 @@ try:
         analyze_news_sentiment,
         comprehensive_risk_assessment
     )
+    # 导入定时任务模块
+    from tradingagents.scheduled_tasks.daily_report import run_scheduler
     
     WEB_API_AVAILABLE = True
 except ImportError as e:
@@ -186,6 +188,15 @@ def list_all_stocks():
     if result and 'error' in result[0]:
         raise HTTPException(status_code=500, detail=result[0]['error'])
     return result
+
+@app.post("/scheduler/start")
+def start_scheduler():
+    """启动定时任务调度器"""
+    try:
+        scheduler_thread = run_scheduler()
+        return {"message": "定时任务调度器已启动", "status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def start_server(host: str = "127.0.0.1", port: int = 8000):
     """启动API服务器"""

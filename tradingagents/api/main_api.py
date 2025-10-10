@@ -72,51 +72,61 @@ def get_comprehensive_stock_analysis(stock_code: str) -> Dict[str, Any]:
     try:
         logger.info(f"开始生成股票 {stock_code} 的综合分析报告")
         
-        # 1. 获取基础信息
-        basic_info = get_stock_info(stock_code)
-        if 'error' in basic_info:
-            return basic_info
-        
-        # 2. 获取技术指标
-        technical_indicators = calculate_technical_indicators(stock_code)
-        if 'error' in technical_indicators:
-            technical_indicators = {'error': '技术指标计算失败'}
-        
-        # 3. 获取交易信号
-        trading_signals = get_trading_signals(stock_code)
-        if 'error' in trading_signals:
-            trading_signals = {'error': '交易信号生成失败'}
-        
-        # 4. 获取趋势预测
-        trend_prediction = predict_stock_trend(stock_code, days=5)
-        if 'error' in trend_prediction:
-            trend_prediction = {'error': '趋势预测失败'}
-        
-        # 5. 获取投资建议
-        investment_suggestion = get_investment_suggestion(stock_code)
-        if 'error' in investment_suggestion:
-            investment_suggestion = {'error': '投资建议生成失败'}
-        
-        # 6. 获取风险评估
-        risk_assessment = comprehensive_risk_assessment(stock_code)
-        if 'error' in risk_assessment:
-            risk_assessment = {'error': '风险评估失败'}
-        
-        # 组合报告
-        report = {
-            'code': stock_code,
-            'generated_at': datetime.now().isoformat(),
-            'basic_info': basic_info,
-            'technical_analysis': technical_indicators,
-            'trading_signals': trading_signals,
-            'trend_prediction': trend_prediction,
-            'investment_suggestion': investment_suggestion,
-            'risk_assessment': risk_assessment,
-            'status': 'success'
-        }
-        
-        logger.info(f"股票 {stock_code} 的综合分析报告生成完成")
-        return report
+        # 尝试使用智能体框架进行深度分析
+        try:
+            from tradingagents.graph.trading_graph import TradingAgentsGraph
+            from tradingagents.default_config import DEFAULT_CONFIG
+            
+            # 创建默认配置
+            config = DEFAULT_CONFIG.copy()
+            config["llm_provider"] = os.getenv("DEFAULT_LLM_PROVIDER", "modelscope")
+            config["deep_think_llm"] = os.getenv("DEEP_THINK_LLM", "ZhipuAI/GLM-4.6")
+            config["quick_think_llm"] = os.getenv("QUICK_THINK_LLM", "ZhipuAI/GLM-4.6")
+            
+            logger.info(f"使用LLM提供商: {config['llm_provider']}")
+            logger.info(f"使用深度思考模型: {config['deep_think_llm']}")
+            logger.info(f"使用快速思考模型: {config['quick_think_llm']}")
+            
+            # 初始化智能体图
+            graph = TradingAgentsGraph(
+                selected_analysts=["market", "social", "news", "fundamentals"],
+                config=config
+            )
+            
+            # 执行分析
+            analysis_date = datetime.now().strftime('%Y-%m-%d')
+            state, decision = graph.propagate(stock_code, analysis_date)
+            
+            # 构建深度分析报告
+            deep_analysis_report = {
+                'code': stock_code,
+                'generated_at': datetime.now().isoformat(),
+                'basic_info': get_stock_info(stock_code),
+                'market_report': state.get('market_report', ''),
+                'news_report': state.get('news_report', ''),
+                'fundamentals_report': state.get('fundamentals_report', ''),
+                'sentiment_report': state.get('sentiment_report', ''),
+                'investment_debate_state': state.get('investment_debate_state', {}),
+                'risk_debate_state': state.get('risk_debate_state', {}),
+                'final_trade_decision': state.get('final_trade_decision', ''),
+                'technical_analysis': calculate_technical_indicators(stock_code),
+                'trading_signals': get_trading_signals(stock_code),
+                'trend_prediction': predict_stock_trend(stock_code, days=5),
+                'investment_suggestion': get_investment_suggestion(stock_code),
+                'risk_assessment': comprehensive_risk_assessment(stock_code),
+                'status': 'success',
+                'analysis_type': 'deep_analysis'
+            }
+            
+            logger.info(f"股票 {stock_code} 的深度综合分析报告生成完成")
+            return deep_analysis_report
+            
+        except Exception as graph_error:
+            logger.error(f"深度分析失败: {graph_error}")
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            # 回退到传统分析方法
+            return _get_traditional_comprehensive_analysis(stock_code)
         
     except Exception as e:
         logger.error(f"生成综合分析报告时发生错误: {e}")
@@ -125,6 +135,63 @@ def get_comprehensive_stock_analysis(stock_code: str) -> Dict[str, Any]:
             'code': stock_code,
             'suggestion': '请检查股票代码和服务状态'
         }
+
+
+def _get_traditional_comprehensive_analysis(stock_code: str) -> Dict[str, Any]:
+    """
+    传统的综合分析方法（作为备选方案）
+    
+    Args:
+        stock_code: 股票代码
+    
+    Returns:
+        Dict: 股票综合分析报告
+    """
+    # 1. 获取基础信息
+    basic_info = get_stock_info(stock_code)
+    if 'error' in basic_info:
+        return basic_info
+    
+    # 2. 获取技术指标
+    technical_indicators = calculate_technical_indicators(stock_code)
+    if 'error' in technical_indicators:
+        technical_indicators = {'error': '技术指标计算失败'}
+    
+    # 3. 获取交易信号
+    trading_signals = get_trading_signals(stock_code)
+    if 'error' in trading_signals:
+        trading_signals = {'error': '交易信号生成失败'}
+    
+    # 4. 获取趋势预测
+    trend_prediction = predict_stock_trend(stock_code, days=5)
+    if 'error' in trend_prediction:
+        trend_prediction = {'error': '趋势预测失败'}
+    
+    # 5. 获取投资建议
+    investment_suggestion = get_investment_suggestion(stock_code)
+    if 'error' in investment_suggestion:
+        investment_suggestion = {'error': '投资建议生成失败'}
+    
+    # 6. 获取风险评估
+    risk_assessment = comprehensive_risk_assessment(stock_code)
+    if 'error' in risk_assessment:
+        risk_assessment = {'error': '风险评估失败'}
+    
+    # 组合报告
+    report = {
+        'code': stock_code,
+        'generated_at': datetime.now().isoformat(),
+        'basic_info': basic_info,
+        'technical_analysis': technical_indicators,
+        'trading_signals': trading_signals,
+        'trend_prediction': trend_prediction,
+        'investment_suggestion': investment_suggestion,
+        'risk_assessment': risk_assessment,
+        'status': 'success',
+        'analysis_type': 'traditional'
+    }
+    
+    return report
 
 def get_market_overview() -> Dict[str, Any]:
     """
@@ -280,6 +347,23 @@ def health_check() -> Dict[str, Any]:
             'error': f'健康检查失败: {str(e)}',
             'suggestion': '请检查服务状态'
         }
+
+# 新增：为定时任务提供接口
+def generate_daily_reports(stock_codes: List[str]) -> List[Dict[str, Any]]:
+    """
+    为定时任务生成多个股票的分析报告
+    
+    Args:
+        stock_codes: 股票代码列表
+    
+    Returns:
+        List[Dict]: 股票分析报告列表
+    """
+    reports = []
+    for stock_code in stock_codes:
+        report = get_comprehensive_stock_analysis(stock_code)
+        reports.append(report)
+    return reports
 
 if __name__ == '__main__':
     # 简单的命令行测试
